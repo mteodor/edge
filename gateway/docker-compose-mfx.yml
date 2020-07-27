@@ -1,0 +1,130 @@
+# Copyright (c) Mainflux
+# SPDX-License-Identifier: Apache-2.0
+
+version: "3.3"
+
+networks:
+  mainflux-base-net:
+    driver: bridge
+
+volumes:
+  mainflux-things-db-volume:
+  mainflux-auth-redis-volume:
+  mainflux-es-redis-volume:
+  mainflux-mqtt-broker-volume:
+  mainflux-mosquitto-data:
+  mainflux-mosquitto-log:
+  
+
+services:
+
+  nats:
+    image: arm32v7/nats:1.3.0
+    container_name: mainflux-nats
+    command: "-c /etc/nats/nats.conf"
+    restart: on-failure
+    volumes:
+      - ./nats/:/etc/nats
+    networks:
+      - mainflux-base-net
+    ports:
+      - 4222:4222
+
+  mosquitto:
+    image: arm32v6/eclipse-mosquitto
+    container_name: mainflux-mosquitto
+    restart: on-failure
+    networks:
+      - mainflux-base-net
+    volumes:
+      - mainflux-mosquitto-data:/mosquitto/data
+      - mainflux-mosquitto-log:/mosquitto/log
+
+  things-db:
+    image: arm32v7/postgres:10.8-alpine
+    container_name: mainflux-things-db
+    restart: on-failure
+    environment:
+      POSTGRES_USER: ${MF_THINGS_DB_USER}
+      POSTGRES_PASSWORD: ${MF_THINGS_DB_PASS}
+      POSTGRES_DB: ${MF_THINGS_DB}
+    networks:
+      - mainflux-base-net
+    volumes:
+      - mainflux-things-db-volume:/var/lib/postgresql/data
+
+  auth-redis:
+    image: arm32v7/redis:5.0-alpine
+    container_name: mainflux-auth-redis
+    restart: on-failure
+    networks:
+      - mainflux-base-net
+    volumes:
+      - mainflux-auth-redis-volume:/data
+
+  things:
+    image: mainflux/things-arm:latest
+    container_name: mainflux-things
+    restart: on-failure
+    environment:
+      MF_THINGS_LOG_LEVEL: ${MF_THINGS_LOG_LEVEL}
+      MF_THINGS_DB_HOST: things-db
+      MF_THINGS_DB_PORT: ${MF_THINGS_DB_PORT}
+      MF_THINGS_DB_USER: ${MF_THINGS_DB_USER}
+      MF_THINGS_DB_PASS: ${MF_THINGS_DB_PASS}
+      MF_THINGS_DB: ${MF_THINGS_DB}
+      MF_THINGS_CACHE_URL: auth-redis:${MF_REDIS_TCP_PORT}
+      MF_THINGS_ES_URL: es-redis:${MF_REDIS_TCP_PORT}
+      MF_THINGS_HTTP_PORT: ${MF_THINGS_HTTP_PORT}
+      MF_THINGS_AUTH_HTTP_PORT: ${MF_THINGS_AUTH_HTTP_PORT}
+      MF_THINGS_AUTH_GRPC_PORT: ${MF_THINGS_AUTH_GRPC_PORT}
+      MF_JAEGER_URL: ${MF_JAEGER_URL}
+      MF_AUTHN_GRPC_URL: ${MF_AUTHN_GRPC_URL}
+      MF_AUTHN_GRPC_TIMEOUT: ${MF_AUTHN_GRPC_TIMEOUT}
+      MF_THINGS_SINGLE_USER_EMAIL: ${MF_THINGS_SINGLE_USER_EMAIL}
+      MF_THINGS_SINGLE_USER_TOKEN: ${MF_THINGS_SINGLE_USER_TOKEN}
+    ports:
+      - ${MF_THINGS_HTTP_PORT}:${MF_THINGS_HTTP_PORT}
+      - ${MF_THINGS_AUTH_HTTP_PORT}:${MF_THINGS_AUTH_HTTP_PORT}
+      - ${MF_THINGS_AUTH_GRPC_PORT}:${MF_THINGS_AUTH_GRPC_PORT}
+    networks:
+      - mainflux-base-net
+
+
+  mqtt-adapter:
+    image: mainflux/mqtt-arm:latest
+    container_name: mainflux-mqtt
+    depends_on:
+      - mosquitto
+      - things
+      - nats
+    restart: on-failure
+    environment:
+      MF_MQTT_ADAPTER_LOG_LEVEL: ${MF_MQTT_ADAPTER_LOG_LEVEL}
+      MF_MQTT_ADAPTER_MQTT_PORT: ${MF_MQTT_ADAPTER_MQTT_PORT}
+      MF_MQTT_ADAPTER_WS_PORT: ${MF_MQTT_ADAPTER_WS_PORT}
+      MF_MQTT_ADAPTER_ES_URL: es-redis:${MF_REDIS_TCP_PORT}
+      MF_NATS_URL: ${MF_NATS_URL}
+      MF_MQTT_ADAPTER_MQTT_TARGET_HOST: mosquitto
+      MF_MQTT_ADAPTER_MQTT_TARGET_PORT: ${MF_MQTT_BROKER_PORT}
+      MF_MQTT_ADAPTER_WS_TARGET_HOST: mosquitto
+      MF_MQTT_ADAPTER_WS_TARGET_PORT: ${MF_MQTT_BROKER_WS_PORT}
+      MF_THINGS_AUTH_GRPC_URL: ${MF_THINGS_AUTH_GRPC_URL}
+      MF_THINGS_AUTH_GRPC_TIMEOUT: ${MF_THINGS_AUTH_GRPC_TIMEOUT}
+      MF_AUTH_CACHE_URL: auth-redis:${MF_REDIS_TCP_PORT}
+    networks:
+      - mainflux-base-net
+    ports:
+      - ${MF_MQTT_ADAPTER_MQTT_PORT}:${MF_MQTT_ADAPTER_MQTT_PORT}
+
+
+
+  es-redis:
+    image: arm32v7/redis:5.0-alpine
+    container_name: mainflux-es-redis
+    restart: on-failure
+    networks:
+      - mainflux-base-net
+    volumes:
+      - mainflux-es-redis-volume:/data
+
