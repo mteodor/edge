@@ -1,0 +1,41 @@
+# Copyright (c) Mainflux
+# SPDX-License-Identifier: Apache-2.0
+version: "3.3"
+
+services:
+  agent:
+      image: arm32v7/mainflux/agent:latest
+      container_name: mainflux-agent
+      restart: on-failure
+      environment:
+        MF_AGENT_LOG_LEVEL: ${MF_AGENT_LOG_LEVEL}
+        MF_AGENT_EDGEX_URL: ${MF_AGENT_EDGEX_URL}
+        MF_AGENT_HTTP_PORT: ${MF_AGENT_HTTP_PORT}
+        MF_AGENT_BOOTSTRAP_URL: ${MF_AGENT_BOOTSTRAP_URL}
+        MF_AGENT_BOOTSTRAP_ID: ${MF_AGENT_BOOTSTRAP_ID}
+        MF_AGENT_BOOTSTRAP_KEY: ${MF_AGENT_BOOTSTRAP_KEY}
+        MF_AGENT_BOOTSTRAP_RETRIES: ${MF_AGENT_BOOTSTRAP_RETRIES}
+        MF_AGENT_BOOTSTRAP_RETRY_DELAY_SECONDS: ${MF_AGENT_BOOTSTRAP_RETRY_DELAY_SECONDS}
+        MF_AGENT_CONFIG_FILE: ${MF_AGENT_CONFIG_FILE}
+      ports:
+        - ${MF_AGENT_HTTP_PORT}:${MF_AGENT_HTTP_PORT}
+      volumes:
+        - ./configs:/configs
+        - ./ca.pem:/etc/ssl/certs/mainflux.pem
+      network_mode: host
+
+  export:
+    image: mainflux/export:latest
+    container_name: mainflux-export
+    restart: on-failure
+    environment:
+      MF_EXPORT_LOG_LEVEL: ${MF_EXPORT_LOG_LEVEL}
+      MF_EXPORT_PORT: ${MF_EXPORT_PORT}
+      MF_EXPORT_CONF_PATH: ${MF_EXPORT_CONF_PATH}
+    ports:
+      - ${MF_EXPORT_PORT}:${MF_EXPORT_PORT}
+    depends_on: 
+        - agent
+    volumes:
+      - ./configs:/configs
+    network_mode: host
