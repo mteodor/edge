@@ -1,8 +1,8 @@
 #!/usr/bin/bash
-# set -x
+ set -x
 
-EXTERNAL_KEY='external_key6'
-EXTERNAL_ID='external_id6'
+EXTERNAL_KEY='raspberry'
+EXTERNAL_ID='pi'
 MAINFLUX_HOST='mt-global.ml'
 MAINFLUX_USER_EMAIL='certs@email.com'
 MAINFLUX_USER_PASSWORD='12345678'
@@ -18,6 +18,7 @@ clientCert=$(echo "${bootstrapResponse}" | jq -r .client_cert)
 caCert=`echo "${bootstrapResponse}" | jq -r .ca_cert`
 thingID=`echo "${bootstrapResponse}" | jq -r .mainflux_id`
 thingKey=`echo "${bootstrapResponse}" | jq -r .mainflux_key`
+echo "${bootstrapResponse}"
 controlChannel=`echo "${bootstrapResponse}" | jq -r '.mainflux_channels[0]'.id`
 echo $controlChannel
 
@@ -39,7 +40,9 @@ clientKey=$(sed  -e 's/[&\\/]/\\&/g; s/$/\\/' -e '$s/\\$//'   <<<"${clientKey}")
 payload=`go run cmd/encode/main.go`
 
 
-
-
-mosquitto_pub -d -L mqtts://${thingID}:${thingKey}@${MAINFLUX_HOST}:8883/channels/$controlChannel/messages/req  --cert  client.crt --key client.key --cafile ca.crt -m  '[{"bn":"1:", "n":"config", "vs":"save, export, export-config.toml, '"${payload}"'"}]'
+# Send export configuration
+mosquitto_pub -d -L mqtts://${thingID}:${thingKey}@${MAINFLUX_HOST}:8883/channels/$controlChannel/messages/req  --cert  `pwd`/client.crt --key `pwd`/client.key --cafile `pwd`/ca.crt -m  '[{"bn":"1:", "n":"config", "vs":"save, export, export-config.toml, '"${payload}"'"}]'
+sleep 2
+# Start the export service
+mosquitto_pub -d -L mqtts://${thingID}:${thingKey}@${MAINFLUX_HOST}:8883/channels/$controlChannel/messages/req  --cert  `pwd`/client.crt --key `pwd`/client.key --cafile `pwd`/ca.crt -m  '[{"bn":"1:", "n":"exec", "vs":"export_start, test"}]'
 
